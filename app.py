@@ -3,42 +3,54 @@ import openai
 import os
 from dotenv import load_dotenv
 
-# Charger la clé API depuis .env
+# Charger les variables d’environnement du fichier .env
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Fonction pour envoyer une requête à l'API OpenAI
-def get_bot_response(message):
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",  # ou "gpt-4" si tu y as accès
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": message}
-        ]
-    )
-    return response["choices"][0]["message"]["content"]
+# Récupérer la clé API depuis la variable d’environnement
+API_KEY = os.getenv("API_KEY")
 
-# Interface Streamlit
-st.title("🤖 OpenAI Chatbot")
+# Vérification : stopper si la clé est manquante
+if not API_KEY:
+    st.error("❌ Clé API non trouvée. Vérifie que le fichier .env est bien présent et correctement configuré.")
+    st.stop()
 
-# Stocker l'historique
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+# Création du client OpenAI
+client = openai.OpenAI(api_key=API_KEY)
 
-# Saisie utilisateur
-user_input = st.text_input("You:", key="user_input")
+# Initialisation de l'historique des messages
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "system", "content": "You're a Chatbot, your name is AlexBot. You've been created by Alexandre Ohayon. You can answer any customer's questions by summarizing your answer."}
+    ]
 
-# Traitement de la conversation
+# Interface utilisateur
+st.title("🤖 AlexBot - Votre assistant IA personnalisé")
+st.markdown("Pose ta question à AlexBot. Tape `exit` pour quitter.")
+
+# Champ de saisie utilisateur
+user_input = st.text_input("Votre message :")
+
 if user_input:
-    st.session_state.chat_history.append(("Client", user_input))
-    response = get_bot_response(user_input)
-    st.session_state.chat_history.append(("Bot", response))
-    st.experimental_rerun()
+    if user_input.lower() == "exit":
+        st.success("Merci d'avoir utilisé AlexBot. À bientôt !")
+        st.stop()
+    
+    # Ajouter le message utilisateur à l'historique
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
-# Afficher la conversation
-st.markdown("### Conversation")
-for sender, message in st.session_state.chat_history:
-    if sender == "Client":
-        st.markdown(f"**🧑 You:** {message}")
-    else:
-        st.markdown(f"**🤖 Bot:** {message}")
+    try:
+        # Appel à l'API OpenAI
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=st.session_state.messages,
+            max_tokens=300,
+            temperature=0.7,
+        )
+
+        # Réponse du chatbot
+        bot_reply = response.choices[0].message.content
+        st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+        st.markdown(f"**AlexBot :** {bot_reply}")
+
+    except Exception as e:
+        st.error(f"Erreur lors de l’appel à l’API : {e}")
